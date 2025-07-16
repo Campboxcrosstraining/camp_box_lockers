@@ -152,10 +152,12 @@
 
       // Contenido locker
       div.innerHTML = `
-        <strong>Locker ${i + 1}</strong>
-        <div class="nombre">${locker.nombre || 'Vacío'}</div>
-        <div class="qr-container" id="qr${i}"></div>
-      `;
+  <img src="locker.png" class="locker-icon" />
+  <strong>Locker ${i + 1}</strong>
+  <div class="nombre">${locker.nombre || 'Vacío'}</div>
+  <div class="qr-container" id="qr${i}"></div>
+`;
+
 
       div.onclick = () => {
         if(locker.estado === 'ocupado'){
