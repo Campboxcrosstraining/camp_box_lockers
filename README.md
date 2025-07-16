@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CAMP BOX LOCKERS</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: white;
+    text-align: center;
+    margin: 20px;
+  }
+  h1 {
+    margin-bottom: 20px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+    max-width: 900px;
+    margin: 0 auto 40px auto;
+  }
+  .locker {
+    background: black;
+    border: 2px solid #00cc66;
+    border-radius: 10px;
+    padding: 15px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .locker.ocupado {
+    background: #00cc66;
+    color: black;
+  }
+  .locker strong {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 18px;
+  }
+  .locker .nombre {
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+  .qr-container {
+    width: 100px;
+    margin: 0 auto;
+  }
+  /* Modal */
+  .modal-bg {
+    position: fixed;
+    top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+  }
+  .modal-bg.active {
+    display: flex;
+  }
+  .modal {
+    background: #222;
+    padding: 20px;
+    border-radius: 8px;
+    width: 300px;
+    color: white;
+  }
+  .modal input[type="text"] {
+    width: 100%;
+    padding: 8px;
+    font-size: 16px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    border: none;
+  }
+  .modal button {
+    padding: 10px 15px;
+    background: #00cc66;
+    border: none;
+    border-radius: 5px;
+    color: black;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .modal button.cancel {
+    background: #cc0000;
+    margin-left: 10px;
+    color: white;
+  }
+</style>
+</head>
+<body>
+
+<h1>CAMP BOX LOCKERS</h1>
+<div class="grid" id="lockersGrid"></div>
+
+<!-- Modal para ingresar nombre -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">Locker #</h3>
+    <input type="text" id="nombreInput" placeholder="Ingresa tu nombre" autocomplete="off" />
+    <div style="text-align:right;">
+      <button id="btnGuardar">Guardar</button>
+      <button id="btnCancelar" class="cancel">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- QRCode.js from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+<script>
+  const totalLockers = 15;
+  const lockersGrid = document.getElementById('lockersGrid');
+  const modalBg = document.getElementById('modalBg');
+  const modalTitle = document.getElementById('modalTitle');
+  const nombreInput = document.getElementById('nombreInput');
+  const btnGuardar = document.getElementById('btnGuardar');
+  const btnCancelar = document.getElementById('btnCancelar');
+
+  // Estado de lockers en localStorage
+  let lockers = JSON.parse(localStorage.getItem('lockers')) || Array(totalLockers).fill(null).map(() => ({ estado: 'vacío', nombre: '' }));
+
+  let lockerSeleccionado = null;
+
+  // Generar URL base para QR, usa ubicación actual sin parámetros
+  const baseUrl = window.location.origin + window.location.pathname;
+
+  // Obtener parámetro locker de la URL
+  function getLockerFromURL() {
+    const params = new URLSearchParams(window.location.search);
+    const lockerParam = params.get('locker');
+    if (!lockerParam) return null;
+    const num = parseInt(lockerParam);
+    if (num >= 1 && num <= totalLockers) return num - 1;
+    return null;
+  }
+
+  function guardarEstado() {
+    localStorage.setItem('lockers', JSON.stringify(lockers));
+  }
+
+  // Mostrar lockers y sus QR
+  function renderLockers() {
+    lockersGrid.innerHTML = '';
+    lockers.forEach((locker, i) => {
+      const div = document.createElement('div');
+      div.classList.add('locker');
+      if(locker.estado === 'ocupado') div.classList.add('ocupado');
+      div.dataset.index = i;
+
+      // Contenido locker
+      div.innerHTML = `
+        <strong>Locker ${i + 1}</strong>
+        <div class="nombre">${locker.nombre || 'Vacío'}</div>
+        <div class="qr-container" id="qr${i}"></div>
+      `;
+
+      div.onclick = () => {
+        if(locker.estado === 'ocupado'){
+          if(confirm(`Liberar locker ${i+1}?`)){
+            lockers[i] = {estado:'vacío', nombre: ''};
+            guardarEstado();
+            renderLockers();
+          }
+        } else {
+          abrirModal(i);
+        }
+      };
+
+      lockersGrid.appendChild(div);
+
+      // Generar QR único para ese locker
+      const qrDiv = document.getElementById(`qr${i}`);
+      QRCode.toCanvas(qrDiv, `${baseUrl}?locker=${i+1}`, { width: 100 }, function (error) {
+        if(error) console.error(error);
+      });
+    });
+  }
+
+  function abrirModal(index) {
+    lockerSeleccionado = index;
+    modalTitle.textContent = `Locker #${index + 1}`;
+    nombreInput.value = '';
+    modalBg.classList.add('active');
+    nombreInput.focus();
+  }
+
+  btnGuardar.onclick = () => {
+    const nombre = nombreInput.value.trim();
+    if(nombre.length === 0){
+      alert('Por favor ingresa un nombre');
+      nombreInput.focus();
+      return;
+    }
+    lockers[lockerSeleccionado] = { estado: 'ocupado', nombre };
+    guardarEstado();
+    modalBg.classList.remove('active');
+    renderLockers();
+    lockerSeleccionado = null;
+    // Remover parámetro locker de la URL al guardar
+    history.replaceState(null, '', baseUrl);
+  };
+
+  btnCancelar.onclick = () => {
+    modalBg.classList.remove('active');
+    lockerSeleccionado = null;
+    // Remover parámetro locker de la URL si estaba
+    history.replaceState(null, '', baseUrl);
+  };
+
+  // Al cargar, verificar si hay locker en URL para abrir modal automáticamente
+  window.onload = () => {
+    renderLockers();
+    const lockerUrl = getLockerFromURL();
+    if(lockerUrl !== null && lockers[lockerUrl].estado === 'vacío'){
+      abrirModal(lockerUrl);
+    }
+  };
+</script>
+</body>
+</html>
